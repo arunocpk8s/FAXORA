@@ -2,6 +2,7 @@
 import logging
 import os
 import secrets
+import tempfile
 
 from dotenv import load_dotenv
 
@@ -30,8 +31,8 @@ def _database_url():
     url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
     if not url and ON_VERCEL:
         # Vercel's disk is read-only except /tmp, which is wiped often: usable only until Postgres is connected.
-        logging.getLogger(__name__).warning("DATABASE_URL is not set; using a temporary SQLite database in /tmp.")
-        return "sqlite:////tmp/tracker.db"
+        logging.getLogger(__name__).warning("DATABASE_URL is not set; using a temporary SQLite database.")
+        return "sqlite:///" + os.path.join(tempfile.gettempdir(), "faxora-tracker.db").replace("\\", "/")
     url = url or "sqlite:///instance/tracker.db"
     # Hosted Postgres (Vercel/Neon) gives postgres:// or postgresql:// URLs; use the psycopg 3 driver.
     for scheme in ("postgres://", "postgresql://"):
