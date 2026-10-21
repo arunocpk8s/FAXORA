@@ -215,7 +215,8 @@ The new values apply to tickets created after the change.
 
 ## Test deployment on Vercel
 
-The repository deploys to Vercel as a Python serverless app (`api/index.py` + `vercel.json`).
+The repository deploys to Vercel with its zero-config Flask support: Vercel imports `app.py`, which
+exposes a top-level `app` when the `VERCEL` variable is set (no `vercel.json` needed).
 Local use is unchanged: without `VERCEL` set, it still uses `.env` and the SQLite file.
 
 1. In Vercel: **Add New -> Project**, import this GitHub repository, keep the defaults, deploy.
