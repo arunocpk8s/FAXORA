@@ -28,6 +28,10 @@
     {% endif %}
   </header>
   <main>
+    {% if temporary_database %}
+    <p class="flash flash-error">This deployment has no permanent database connected, so it uses a temporary one that is wiped often (users and tickets disappear).
+      Connect a Postgres database in Vercel (Storage) and redeploy.</p>
+    {% endif %}
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% for category, message in messages %}
       <p class="flash flash-{{ category }}">{{ message }}</p>

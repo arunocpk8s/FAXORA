@@ -27,8 +27,20 @@ def _bool(name, default=False):
 ON_VERCEL = bool(os.environ.get("VERCEL"))
 
 
+def _hosted_postgres_url():
+    """Vercel storage may add a prefix (e.g. STORAGE_DATABASE_URL); find any Postgres URL variable."""
+    for name in sorted(os.environ):
+        if name.endswith(("DATABASE_URL", "POSTGRES_URL")) and "UNPOOLED" not in name:
+            value = os.environ[name]
+            if value.startswith(("postgres://", "postgresql://")):
+                return value
+    return None
+
+
 def _database_url():
     url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+    if not url and ON_VERCEL:
+        url = _hosted_postgres_url()
     if not url and ON_VERCEL:
         # Vercel's disk is read-only except /tmp, which is wiped often: usable only until Postgres is connected.
         logging.getLogger(__name__).warning("DATABASE_URL is not set; using a temporary SQLite database.")

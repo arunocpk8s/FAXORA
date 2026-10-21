@@ -73,6 +73,9 @@ def create_app(test_config=None):
             "app_name": app.config["APP_NAME"],
             "logo_file": logo,
             "emergency_numbers": notify.emergency_numbers(),
+            # Hosted copy without a real database: data is lost on restart, so say so on every page.
+            "temporary_database": bool(os.environ.get("VERCEL"))
+            and app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"),
         }
 
     register_cli(app)
