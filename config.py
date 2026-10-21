@@ -22,8 +22,17 @@ def _bool(name, default=False):
     return value in ("1", "true", "yes", "on")
 
 
+# Vercel sets VERCEL=1 in its environment.
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+
+
 def _database_url():
-    url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL") or "sqlite:///instance/tracker.db"
+    url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
+    if not url and ON_VERCEL:
+        # Vercel's disk is read-only except /tmp, which is wiped often: usable only until Postgres is connected.
+        logging.getLogger(__name__).warning("DATABASE_URL is not set; using a temporary SQLite database in /tmp.")
+        return "sqlite:////tmp/tracker.db"
+    url = url or "sqlite:///instance/tracker.db"
     # Hosted Postgres (Vercel/Neon) gives postgres:// or postgresql:// URLs; use the psycopg 3 driver.
     for scheme in ("postgres://", "postgresql://"):
         if url.startswith(scheme):
@@ -35,10 +44,6 @@ def _database_url():
         if path and path != ":memory:" and not os.path.isabs(path):
             url = prefix + os.path.join(BASE_DIR, path).replace("\\", "/")
     return url
-
-
-# Vercel sets VERCEL=1 in its environment.
-ON_VERCEL = bool(os.environ.get("VERCEL"))
 
 
 def _secret_key():

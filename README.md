@@ -213,6 +213,31 @@ recorded or logged.
 Edit `SLA_HOURS` (hours per category) and `PRIORITY_FACTOR` (urgent multiplier) in `sla.py`.
 The new values apply to tickets created after the change.
 
+## Test deployment on Vercel
+
+The repository deploys to Vercel as a Python serverless app (`api/index.py` + `vercel.json`).
+Local use is unchanged: without `VERCEL` set, it still uses `.env` and the SQLite file.
+
+1. In Vercel: **Add New -> Project**, import this GitHub repository, keep the defaults, deploy.
+2. **Storage -> Create database -> Neon (Postgres)** and connect it to the project. This sets
+   `DATABASE_URL`. Until it is connected, the app uses a temporary SQLite file in `/tmp` that is
+   wiped often.
+3. **Settings -> Environment Variables**: add `SECRET_KEY` (64 random hex characters; required,
+   the app refuses to start without it on Vercel) and `APP_BASE_URL` (`https://<project>.vercel.app`).
+   Optional: `SMTP_*`, `CATEGORY_MAILBOX_*` (or set mail in the Admin console later).
+4. **Deployments -> Redeploy** so the new variables are used.
+5. Create the first users in the Vercel database from your PC (PowerShell, project folder):
+   ```powershell
+   $env:DATABASE_URL = "<Neon connection string from Vercel Storage -> .env.local>"
+   .venv\Scripts\python.exe seed.py
+   Remove-Item Env:DATABASE_URL
+   ```
+   `seed.py` uses the `SEED_*_PASSWORD` values from your local `.env`.
+
+Notes: cookies are Secure automatically on Vercel; emails go out only when SMTP is configured
+(Gmail port 587 works from Vercel; port 25 is blocked there). Scheduled `resend-failed` is not set
+up on Vercel; use **Admin console -> Email outbox -> Resend all** instead.
+
 ## Deploying later
 
 1. **Server:** run behind a WSGI server instead of `flask run`, e.g.
