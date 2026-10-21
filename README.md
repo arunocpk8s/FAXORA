@@ -216,7 +216,8 @@ The new values apply to tickets created after the change.
 ## Test deployment on Vercel
 
 The repository deploys to Vercel with its Flask support: `pyproject.toml` points Vercel at
-`wsgi:app` (`wsgi.py`), and packages come from `requirements.txt`.
+`wsgi:app` (`wsgi.py`); Vercel installs the packages listed in `pyproject.toml` / `uv.lock`
+(keep them in sync with `requirements.txt`, which local installs use).
 Local use is unchanged: without `VERCEL` set, it still uses `.env` and the SQLite file.
 
 1. In Vercel: **Add New -> Project**, import this GitHub repository, keep the defaults, deploy.
