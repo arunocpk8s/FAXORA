@@ -1,0 +1,105 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1f2933; background: #f5f7fa; line-height: 1.45; }
+a { color: #1d5fbf; }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 1.4rem; margin: 0.5rem 0 1rem; }
+h2 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 16px; background: #fff; border-bottom: 3px solid #1f2933; }
+.topbar a { color: #1f2933; }
+.topbar nav { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand-logo { height: 36px; width: auto; }
+.brand-name { font-weight: 800; font-size: 1.25rem; letter-spacing: 0.08em; }
+.brand-sub { color: #616e7c; font-size: 0.9rem; padding-left: 10px; border-left: 1px solid #cbd2d9; }
+.who { color: #616e7c; font-size: 0.9rem; }
+.topbar a.button, .topbar a.sos-button { color: #fff; }
+
+.card { background: #fff; border: 1px solid #e4e7eb; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+.narrow { max-width: 380px; margin: 40px auto; }
+.login-logo { display: block; max-width: 220px; max-height: 70px; margin: 0 auto 8px; }
+
+label { display: block; margin-top: 10px; font-weight: 600; font-size: 0.9rem; }
+label.inline { display: inline-flex; gap: 6px; align-items: center; font-weight: normal; }
+input, select, textarea { width: 100%; padding: 7px 8px; border: 1px solid #cbd2d9; border-radius: 4px; font: inherit; }
+input[type=checkbox] { width: auto; }
+button, .button { display: inline-block; margin-top: 12px; padding: 8px 14px; border: 0; border-radius: 4px; background: #1d5fbf; color: #fff; font: inherit; cursor: pointer; text-decoration: none; }
+.topbar .button { margin-top: 0; }
+button:hover, .button:hover { background: #174d9b; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.error { color: #b42318; margin: 4px 0 0; font-size: 0.85rem; }
+
+.flash { padding: 10px 12px; border-radius: 4px; background: #e8f0fe; }
+.flash-success { background: #e3f6e8; }
+.flash-error { background: #fde8e8; color: #b42318; }
+
+.tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.tile { background: #fff; border: 1px solid #e4e7eb; border-radius: 6px; padding: 12px; }
+.tile-value { display: block; font-size: 1.8rem; font-weight: 700; }
+.tile-label { color: #616e7c; font-size: 0.9rem; }
+.tile-alert .tile-value { color: #b42318; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
+.filters label { margin-top: 0; }
+.filters select { width: auto; }
+.filters button { margin-top: 0; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.9rem; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #e4e7eb; vertical-align: top; }
+th { background: #f0f2f5; }
+.overdue { color: #b42318; font-weight: 600; }
+.muted { color: #7b8794; }
+
+.status { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.8rem; background: #e4e7eb; }
+.status-NEW { background: #e8f0fe; }
+.status-ASSIGNED, .status-IN_PROGRESS { background: #fff4d6; }
+.status-ON_HOLD { background: #f3e8ff; }
+.status-RESOLVED { background: #e3f6e8; }
+.status-CLOSED { background: #e4e7eb; color: #52606d; }
+.status-CANCELLED { background: #fde8e8; color: #912018; }
+.inline-form { display: flex; gap: 6px; align-items: center; }
+.inline-form input { width: 160px; padding: 4px 6px; }
+.badge-breached { margin-left: 8px; color: #b42318; font-weight: 600; font-size: 0.85rem; }
+
+.details { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+.details dt { color: #616e7c; }
+.details dd { margin: 0; }
+.description { white-space: pre-wrap; }
+.actions form { margin-bottom: 12px; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 16px; border-bottom: 2px solid #e4e7eb; }
+.tabs a { padding: 8px 14px; color: #52606d; text-decoration: none; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.tabs a.active { color: #1f2933; font-weight: 700; border-bottom-color: #d92d20; }
+.push-right { margin-left: auto; }
+.inactive-row td { color: #9aa5b1; }
+.mail-status { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.8rem; background: #e4e7eb; }
+.mail-PENDING { background: #fff4d6; }
+.mail-SENT { background: #e3f6e8; }
+.wrap { word-break: break-word; max-width: 260px; }
+.actions-cell { white-space: nowrap; }
+.actions-cell form { display: inline; }
+button.small { margin-top: 0; padding: 3px 10px; font-size: 0.85rem; }
+button.danger { background: #fff; color: #b42318; border: 1px solid #b42318; }
+button.danger:hover { background: #fde8e8; }
+.hint { color: #7b8794; font-size: 0.8rem; margin: 4px 0 0; }
+
+.sos-button { padding: 6px 14px; border-radius: 4px; background: #d92d20; font-weight: 700; text-decoration: none; letter-spacing: 0.05em; }
+.sos-button:hover { background: #b42318; }
+.sos-card { border-color: #f5b5b0; max-width: 640px; }
+.sos-emergency { padding: 10px 12px; border-radius: 4px; background: #fde8e8; color: #912018; }
+button.sos-submit { background: #d92d20; font-size: 1.1rem; font-weight: 700; padding: 12px 24px; }
+button.sos-submit:hover { background: #b42318; }
+.sos-banner { margin-bottom: 16px; padding: 12px 16px; border-radius: 6px; background: #d92d20; color: #fff; }
+.sos-banner a { color: #fff; font-weight: 700; }
+.sos-banner ul { margin: 6px 0 0; padding-left: 20px; }
+.sos-row td { background: #fff1f0; }
+.badge-sos { display: inline-block; padding: 0 6px; border-radius: 3px; background: #d92d20; color: #fff; font-size: 0.75rem; font-weight: 700; }
+.flash-sos { background: #d92d20; color: #fff; font-weight: 600; }
+
+@media (max-width: 700px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .row { grid-template-columns: 1fr; }
+}
+.tab-count { display: inline-block; min-width: 22px; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: #e4e7eb; font-size: 0.8rem; text-align: center; }
+.tabs a.active .tab-count { background: #1f2933; color: #fff; }

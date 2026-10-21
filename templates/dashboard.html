@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+{% if g.user.is_staff %}
+{% if sos_open %}
+<section class="sos-banner">
+  <strong>{{ sos_open | length }} active SOS</strong>
+  <ul>
+    {% for t in sos_open %}
+    <li><a href="{{ url_for('main.ticket_detail', ticket_id=t.id) }}">{{ t.ticket_no }}</a>:
+      {{ t.requester.full_name }} at {{ t.location }} (raised {{ t.created_at | ist }}, {{ t.status }})</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+<h1>{% if g.user.is_admin %}All tickets{% else %}{{ (g.user.team or "No").title() }} team tickets{% endif %}</h1>
+{% if not g.user.is_admin and not g.user.team %}<p class="flash flash-error">You are not in a team yet. Ask an admin to add you to one.</p>{% endif %}
+<section class="tiles">
+  <div class="tile tile-alert"><span class="tile-value" data-count="sos">{{ counts.sos }}</span><span class="tile-label">Active SOS</span></div>
+  <div class="tile"><span class="tile-value" data-count="open">{{ counts.open }}</span><span class="tile-label">Open</span></div>
+  <div class="tile tile-alert"><span class="tile-value" data-count="overdue">{{ counts.overdue }}</span><span class="tile-label">Overdue</span></div>
+  <div class="tile"><span class="tile-value" data-count="resolved_today">{{ counts.resolved_today }}</span><span class="tile-label">Resolved today</span></div>
+  <div class="tile"><span class="tile-value" data-count="total_month">{{ counts.total_month }}</span><span class="tile-label">Total this month</span></div>
+</section>
+
+<form class="filters" method="get" action="{{ url_for('main.dashboard') }}">
+  <input type="hidden" name="view" value="{{ filters.view }}">
+  <label>Category
+    <select name="category">
+      <option value="">All</option>
+      {% for c in categories %}<option value="{{ c }}" {% if filters.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Status
+    <select name="status">
+      <option value="">All</option>
+      {% for s in statuses %}<option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Month raised
+    <select name="month">
+      <option value="">All</option>
+      {% for value, label in months %}<option value="{{ value }}" {% if filters.month == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  {% if g.user.is_admin %}
+  <label>Team
+    <select name="team">
+      <option value="">All</option>
+      {% for c in categories %}<option value="{{ c }}" {% if filters.team == c %}selected{% endif %}>{{ c.title() }}</option>{% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label class="inline"><input type="checkbox" name="breached" value="1" {% if filters.breached %}checked{% endif %}> Breached only</label>
+  <button type="submit">Filter</button>
+  <a href="{{ url_for('main.dashboard') }}">Clear</a>
+  <span class="muted" id="refreshed"></span>
+  <a class="button push-right" href="{{ url_for('main.export_tickets', **request.args) }}">Export CSV</a>
+</form>
+<nav class="tabs" aria-label="Ticket views">
+  {% for key, label, count, url in views %}
+  <a href="{{ url }}" {% if filters.view == key %}class="active" aria-current="page"{% endif %}>{{ label }} <span class="tab-count">{{ count }}</span></a>
+  {% endfor %}
+</nav>
+{% else %}
+<h1>My requests</h1>
+{% endif %}
+
+<p class="muted" id="ticket-empty" {% if rows %}hidden{% endif %}>No tickets found.</p>
+<div class="table-wrap">
+<table id="ticket-table" {% if not rows %}hidden{% endif %} {% if g.user.is_staff %}data-api="{{ url_for('main.api_tickets') }}"{% endif %}>
+  <thead>
+    <tr>
+      <th>Ticket</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th>
+      <th>Requester</th><th>Team</th><th>Due at</th><th>Time left</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr {% if r.is_sos %}class="sos-row"{% endif %}>
+      <td><a href="{{ r.url }}">{{ r.ticket_no }}</a>{% if r.is_sos %} <span class="badge-sos">SOS</span>{% endif %}</td>
+      <td>{{ r.title }}</td>
+      <td>{{ r.category }}</td>
+      <td>{{ r.priority }}</td>
+      <td><span class="status status-{{ r.status }}">{{ r.status }}</span></td>
+      <td>{{ r.requester }}</td>
+      <td>{{ r.team or "—" }}</td>
+      <td>{{ r.due_at }}</td>
+      <td class="{% if r.overdue %}overdue{% endif %}">{{ r.time_left }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

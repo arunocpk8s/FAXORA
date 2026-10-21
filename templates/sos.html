@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}SOS · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="card sos-card">
+  <h1>SOS: get urgent help</h1>
+  <p class="sos-emergency">If this is life-threatening, call now: <strong>{{ emergency_numbers }}</strong></p>
+  <p>Sending an SOS alerts the facility response team and all agents straight away.
+     For something that isn't urgent, <a href="{{ url_for('main.new_ticket') if g.user.role == 'employee' else url_for('main.dashboard') }}">raise a normal request</a> instead.</p>
+
+  <form method="post" action="{{ url_for('main.sos') }}" data-confirm="Send SOS now? The response team will be alerted.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label for="location">Where are you? (required)</label>
+    <input id="location" name="location" maxlength="200" value="{{ form.location }}" placeholder="Building, floor, room or desk" required autofocus>
+    {% if errors.location %}<p class="error">{{ errors.location }}</p>{% endif %}
+
+    <label for="phone">Phone number to reach you (optional)</label>
+    <input id="phone" name="phone" maxlength="40" value="{{ form.phone }}" inputmode="tel">
+
+    <label for="note">What's happening? (optional)</label>
+    <textarea id="note" name="note" rows="3" maxlength="2000" placeholder="e.g. colleague fainted, chest pain, injury">{{ form.note }}</textarea>
+
+    <button type="submit" class="sos-submit">Send SOS</button>
+    <a href="{{ url_for('main.dashboard') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

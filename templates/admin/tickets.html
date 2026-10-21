@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Tickets · {{ app_name }}{% endblock %}
+{% block content %}
+{% with active = 'tickets' %}{% include "admin/_tabs.html" %}{% endwith %}
+
+<form class="filters" method="get" action="{{ url_for('admin.tickets') }}">
+  <label>Search
+    <input name="q" value="{{ filters.q }}" placeholder="Ticket no, title or location">
+  </label>
+  <label>Month
+    <select name="month">
+      <option value="">All</option>
+      {% for value, label in months %}<option value="{{ value }}" {% if filters.month == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Status
+    <select name="status">
+      <option value="">All</option>
+      {% for s in statuses %}<option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="inline"><input type="checkbox" name="show" value="deleted" {% if filters.show %}checked{% endif %}> Show deleted</label>
+  <button type="submit">Filter</button>
+  <a href="{{ url_for('admin.tickets') }}">Clear</a>
+</form>
+<p class="hint">Delete only test, duplicate or spam tickets. To stop a real request, cancel it on the ticket page instead.
+  Deleted tickets are hidden everywhere but kept, with their history, for audit.</p>
+
+{% if tickets %}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>Ticket</th><th>Created</th><th>Title</th><th>Category</th><th>Status</th><th>Requester</th>
+      <th>{{ "Deleted" if filters.show else "Delete" }}</th></tr>
+  </thead>
+  <tbody>
+    {% for t in tickets %}
+    <tr>
+      <td>{% if filters.show %}{{ t.ticket_no }}{% else %}<a href="{{ url_for('main.ticket_detail', ticket_id=t.id) }}">{{ t.ticket_no }}</a>{% endif %}</td>
+      <td>{{ t.created_at | ist }}</td>
+      <td>{{ t.title }}</td>
+      <td>{{ t.category }}</td>
+      <td><span class="status status-{{ t.status }}">{{ t.status }}</span></td>
+      <td>{{ t.requester.full_name }}</td>
+      <td>
+        {% if filters.show %}
+        {{ t.deleted_at | ist }}<br><span class="muted">by {{ deleters.get(t.deleted_by_id, "unknown") }}</span>
+        {% else %}
+        <form class="inline-form" method="post" action="{{ url_for('admin.delete_ticket', ticket_id=t.id) }}"
+              data-confirm="Delete {{ t.ticket_no }}? It will be hidden from all lists.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input name="reason" maxlength="500" placeholder="Reason" required>
+          <button type="submit" class="small danger">Delete</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="hint">Shows up to 500 tickets, newest first.</p>
+{% else %}
+<p class="muted">No tickets match.</p>
+{% endif %}
+{% endblock %}

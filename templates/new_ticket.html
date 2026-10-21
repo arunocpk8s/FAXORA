@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Raise a request · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Raise a facility request</h1>
+  <form method="post" action="{{ url_for('main.new_ticket') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <label for="title">Title</label>
+    <input id="title" name="title" maxlength="200" value="{{ form.title }}" required>
+    {% if errors.title %}<p class="error">{{ errors.title }}</p>{% endif %}
+
+    <div class="row">
+      <div>
+        <label for="category">Category</label>
+        <select id="category" name="category" required>
+          <option value="">Choose…</option>
+          {% for c in categories %}<option value="{{ c }}" {% if form.category == c %}selected{% endif %}>{{ c.title() }}</option>{% endfor %}
+        </select>
+        {% if errors.category %}<p class="error">{{ errors.category }}</p>{% endif %}
+        <p class="hint">Medical: health help that isn't an emergency. For an emergency use <a href="{{ url_for('main.sos') }}">SOS</a>.</p>
+      </div>
+      <div>
+        <label for="priority">Priority</label>
+        <select id="priority" name="priority" required>
+          {% for p in priorities %}<option value="{{ p }}" {% if form.priority == p %}selected{% endif %}>{{ p.title() }}</option>{% endfor %}
+        </select>
+        {% if errors.priority %}<p class="error">{{ errors.priority }}</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="department">Department</label>
+        <select id="department" name="department" required>
+          <option value="">Choose…</option>
+          {% for d in departments %}<option value="{{ d }}" {% if form.department == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
+        </select>
+        {% if errors.department %}<p class="error">{{ errors.department }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="location">Location</label>
+        <input id="location" name="location" maxlength="200" value="{{ form.location }}" placeholder="Building, floor, room" required>
+        {% if errors.location %}<p class="error">{{ errors.location }}</p>{% endif %}
+      </div>
+    </div>
+
+    <label for="description">Description</label>
+    <textarea id="description" name="description" rows="6" required>{{ form.description }}</textarea>
+    {% if errors.description %}<p class="error">{{ errors.description }}</p>{% endif %}
+
+    <button type="submit">Submit request</button>
+    <a href="{{ url_for('main.dashboard') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

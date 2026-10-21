@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Reports · {{ app_name }}{% endblock %}
+{% block content %}
+{% with active = 'reports' %}{% include "admin/_tabs.html" %}{% endwith %}
+
+<form class="filters" method="get" action="{{ url_for('admin.report') }}">
+  <label>Month
+    <select name="month">
+      {% for value, text in months %}<option value="{{ value }}" {% if month == value %}selected{% endif %}>{{ text }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit">Show</button>
+  <a class="button push-right" href="{{ url_for('admin.report_csv', kind='summary', month=month) }}">Export summary (CSV)</a>
+  <a class="button" href="{{ url_for('admin.report_csv', kind='tickets', month=month) }}">Export all tickets (CSV)</a>
+</form>
+
+{% set t = summary.total %}
+<h2>{{ label }}</h2>
+<section class="tiles">
+  <div class="tile"><span class="tile-value">{{ t.created }}</span><span class="tile-label">Tickets raised</span></div>
+  <div class="tile"><span class="tile-value">{{ t.resolved }}</span><span class="tile-label">Resolved or closed</span></div>
+  <div class="tile"><span class="tile-value">{{ t.open }}</span><span class="tile-label">Still open</span></div>
+  <div class="tile"><span class="tile-value">{{ t.cancelled }}</span><span class="tile-label">Cancelled</span></div>
+  <div class="tile {% if t.breached %}tile-alert{% endif %}"><span class="tile-value">{{ "%s%%" % t.sla_met_pct if t.sla_met_pct is not none else "—" }}</span><span class="tile-label">SLA met (of resolved)</span></div>
+</section>
+<p class="hint">Tickets raised in the month (IST), excluding deleted tickets. SLA met = resolved or closed without breaching the due time.</p>
+
+{% macro figures_table(title, rows, first) %}
+<section class="card">
+  <h2>{{ title }}</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>{{ first }}</th><th>Raised</th><th>Open</th><th>Resolved/closed</th><th>Cancelled</th><th>Breached</th><th>SLA met</th><th>Avg resolution</th></tr></thead>
+    <tbody>
+      {% for name, f in rows %}
+      <tr {% if not f.created %}class="inactive-row"{% endif %}>
+        <td>{{ name.title() }}</td><td>{{ f.created }}</td><td>{{ f.open }}</td><td>{{ f.resolved }}</td>
+        <td>{{ f.cancelled }}</td><td class="{% if f.breached %}overdue{% endif %}">{{ f.breached }}</td>
+        <td>{{ "%s%%" % f.sla_met_pct if f.sla_met_pct is not none else "—" }}</td>
+        <td>{{ "%s h" % f.avg_hours if f.avg_hours is not none else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endmacro %}
+{{ figures_table("By category", summary.by_category, "Category") }}
+{{ figures_table("By team", summary.by_team, "Team") }}
+{% endblock %}

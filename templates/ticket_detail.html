@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.ticket_no }} · {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('main.dashboard') }}">&larr; Back</a></p>
+<section class="card">
+  <h1>{{ ticket.ticket_no }}: {{ ticket.title }}</h1>
+  {% if ticket.is_sos and ticket.is_open %}
+  <p class="sos-emergency">SOS active. If this is life-threatening, call now: <strong>{{ emergency_numbers }}</strong></p>
+  {% endif %}
+  <p>{% if ticket.is_sos %}<span class="badge-sos">SOS</span> {% endif %}<span class="status status-{{ ticket.status }}">{{ ticket.status }}</span>
+    {% if ticket.breached %}<span class="badge-breached">SLA breached</span>{% endif %}</p>
+  <dl class="details">
+    <dt>Category</dt><dd>{{ ticket.category }}</dd>
+    <dt>Priority</dt><dd>{{ ticket.priority }}</dd>
+    <dt>Requester</dt><dd>{{ ticket.requester.full_name }}</dd>
+    <dt>Department</dt><dd>{{ ticket.department }}</dd>
+    <dt>Location</dt><dd>{{ ticket.location }}</dd>
+    <dt>Assigned team</dt><dd>{{ ticket.assigned_team.title() ~ " team" if ticket.assigned_team else "Not assigned yet" }}</dd>
+    <dt>Created</dt><dd>{{ ticket.created_at | ist }}</dd>
+    <dt>Due</dt><dd>{{ ticket.due_at | ist }}{% if time_left %} <span class="{% if ticket.breached %}overdue{% endif %}">({{ time_left }})</span>{% endif %}</dd>
+    {% if ticket.resolved_at %}<dt>Resolved</dt><dd>{{ ticket.resolved_at | ist }}</dd>{% endif %}
+  </dl>
+  <h2>Description</h2>
+  <p class="description">{{ ticket.description }}</p>
+</section>
+
+{% if g.user.is_staff %}
+<section class="card actions">
+  <h2>Actions</h2>
+  {% if g.user.is_admin and ticket.status not in ("CLOSED", "CANCELLED") %}
+  <form method="post" action="{{ url_for('main.assign', ticket_id=ticket.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="team">Assign to facility team</label>
+    <select id="team" name="team" required>
+      <option value="" disabled {% if not ticket.assigned_team %}selected{% endif %}>Choose team…</option>
+      {% for team, members in team_options %}
+      <option value="{{ team }}" {% if ticket.assigned_team == team %}selected{% endif %}>{{ team }} ({{ members }} agent{{ "" if members == 1 else "s" }})</option>
+      {% endfor %}
+    </select>
+    <p class="hint">The team's agents and mailbox are emailed and can then update this ticket.{% if ticket.status == "NEW" %} Status moves to IN_PROGRESS.{% endif %}</p>
+    <button type="submit">Assign to team</button>
+  </form>
+  {% endif %}
+
+  {% if can_update and next_statuses %}
+  <form method="post" action="{{ url_for('main.change_status', ticket_id=ticket.id) }}"
+        data-confirm="Change status of {{ ticket.ticket_no }} to {status}?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="status">Change status (current: {{ ticket.status }})</label>
+    <select id="status" name="status" required>
+      <option value="" disabled selected>Choose new status…</option>
+      {% for s in next_statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+    </select>
+    {% if not ticket.assigned_team and "IN_PROGRESS" in next_statuses %}
+    <p class="hint">Starting work (IN_PROGRESS) assigns this ticket to {{ "your team" if g.user.role == "agent" else "the " ~ ticket.category.title() ~ " team" }}.</p>
+    {% endif %}
+    <label for="comment">Comment (optional)</label>
+    <textarea id="comment" name="comment" rows="2" maxlength="2000"></textarea>
+    <button type="submit">Update status</button>
+  </form>
+  {% elif ticket.status in ("CLOSED", "CANCELLED") %}
+  <p class="muted">This ticket is {{ ticket.status.lower() }}.</p>
+  {% elif not can_update %}
+  <p class="muted">Only the {{ ticket.assigned_team.title() ~ " team" if ticket.assigned_team else ticket.category.title() ~ " team" }} or an admin can update this ticket.</p>
+  {% endif %}
+
+  {% if can_update and can_cancel %}
+  <form method="post" action="{{ url_for('main.change_status', ticket_id=ticket.id) }}"
+        data-confirm="Cancel {{ ticket.ticket_no }}? The requester will be told.">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="status" value="CANCELLED">
+    <label for="cancel-reason">Cancel ticket (e.g. duplicate, no longer needed, raised by mistake)</label>
+    <input id="cancel-reason" name="comment" maxlength="2000" placeholder="Reason for cancelling" required>
+    <button type="submit" class="danger">Cancel ticket</button>
+  </form>
+  {% endif %}
+  {% if g.user.is_admin %}
+  <p class="hint">Test, duplicate or spam tickets can be deleted in the <a href="{{ url_for('admin.tickets', q=ticket.ticket_no) }}">admin console</a>.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>History</h2>
+  <table>
+    <thead><tr><th>When</th><th>By</th><th>Event</th><th>Change</th><th>Comment</th></tr></thead>
+    <tbody>
+      {% for e in ticket.events %}
+      <tr>
+        <td>{{ e.created_at | ist }}</td>
+        <td>{{ e.actor.full_name }}</td>
+        <td>{{ e.event_type }}</td>
+        <td>{% if e.old_value %}{{ e.old_value }} &rarr; {% endif %}{{ e.new_value or "" }}</td>
+        <td class="description">{{ e.comment or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

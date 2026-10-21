@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit " ~ user.username if user else "Add user" }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% with active = 'users' %}{% include "admin/_tabs.html" %}{% endwith %}
+<p><a href="{{ url_for('admin.users') }}">&larr; All users</a></p>
+
+<section class="card">
+  <h2>{{ "Edit " ~ user.username if user else "Add an agent or admin" }}
+    {% if user and not user.active %}<span class="badge-breached">Deactivated</span>{% endif %}</h2>
+  <form method="post" action="{{ url_for('admin.edit_user', user_id=user.id) if user else url_for('admin.new_user') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <div>
+        <label for="username">Username</label>
+        {% if user %}
+        <input id="username" value="{{ user.username }}" disabled>
+        {% else %}
+        <input id="username" name="username" value="{{ form.username }}" maxlength="40" autocomplete="off" required>
+        {% if errors.username %}<p class="error">{{ errors.username }}</p>{% endif %}
+        {% endif %}
+      </div>
+      <div>
+        <label for="full_name">Full name</label>
+        <input id="full_name" name="full_name" value="{{ form.full_name }}" maxlength="120" required>
+        {% if errors.full_name %}<p class="error">{{ errors.full_name }}</p>{% endif %}
+      </div>
+    </div>
+    <label for="email">Email (receives notifications)</label>
+    <input id="email" name="email" type="email" value="{{ form.email }}" maxlength="200" required>
+    {% if errors.email %}<p class="error">{{ errors.email }}</p>{% endif %}
+    <div class="row">
+      <div>
+        <label for="role">Role</label>
+        <select id="role" name="role" data-team-toggle>
+          {% for r in roles %}<option value="{{ r }}" {% if form.role == r %}selected{% endif %}>{{ r.title() }}</option>{% endfor %}
+        </select>
+        <p class="hint">Agent: handles their team's tickets. Admin: everything, including this console.
+          Employees (requesters) are not created here; they will sign in with company SSO.</p>
+        {% if errors.role %}<p class="error">{{ errors.role }}</p>{% endif %}
+      </div>
+      <div id="team-field">
+        <label for="team">Team (agents only)</label>
+        <select id="team" name="team">
+          <option value="">Choose…</option>
+          {% for t in teams %}<option value="{{ t }}" {% if form.team == t %}selected{% endif %}>{{ t.title() }}</option>{% endfor %}
+        </select>
+        {% if errors.team %}<p class="error">{{ errors.team }}</p>{% endif %}
+      </div>
+    </div>
+    {% if not user %}
+    <div class="row">
+      <div>
+        <label for="password">Password (at least 8 characters)</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" required>
+        {% if errors.password %}<p class="error">{{ errors.password }}</p>{% endif %}
+      </div>
+      <div>
+        <label for="password2">Repeat password</label>
+        <input id="password2" name="password2" type="password" autocomplete="new-password" required>
+      </div>
+    </div>
+    {% endif %}
+    <button type="submit">{{ "Save changes" if user else "Create user" }}</button>
+    <a href="{{ url_for('admin.users') }}">Cancel</a>
+  </form>
+</section>
+
+{% if user %}
+<section class="card">
+  <h2>Reset password</h2>
+  <form method="post" action="{{ url_for('admin.reset_password', user_id=user.id) }}"
+        data-confirm="Set a new password for {{ user.username }}?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row">
+      <div>
+        <label for="new-password">New password (at least 8 characters)</label>
+        <input id="new-password" name="password" type="password" autocomplete="new-password" required>
+      </div>
+      <div>
+        <label for="new-password2">Repeat new password</label>
+        <input id="new-password2" name="password2" type="password" autocomplete="new-password" required>
+      </div>
+    </div>
+    <button type="submit">Set new password</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Account status</h2>
+  <form method="post" action="{{ url_for('admin.set_active', user_id=user.id) }}"
+        data-confirm="{{ ('Reactivate ' if not user.active else 'Deactivate ') ~ user.username }}?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% if user.active %}
+    <p>Deactivated users are signed out immediately and cannot log in. Their tickets and history are kept.</p>
+    <input type="hidden" name="active" value="0">
+    <button type="submit" class="danger">Deactivate account</button>
+    {% else %}
+    <p>This account is deactivated.</p>
+    <input type="hidden" name="active" value="1">
+    <button type="submit">Reactivate account</button>
+    {% endif %}
+  </form>
+</section>
+{% endif %}
+{% endblock %}
