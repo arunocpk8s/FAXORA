@@ -1,31 +1,12 @@
-"""Vercel entry point: exposes the Flask app as a WSGI callable named `app`.
+"""Vercel entry point (used if the project is not detected as zero-config Flask).
 
-If the app cannot start (for example SECRET_KEY or DATABASE_URL missing), a plain error page
-explains why instead of Vercel's generic 500, with any credentials in URLs masked.
+Exposes the same WSGI app as app.py's top-level `app`; start-up errors are shown as a plain page.
 """
-import logging
 import os
-import re
 import sys
-import traceback
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-try:
-    from app import create_app
+import app as faxora  # noqa: E402
 
-    app = create_app()
-except Exception as exc:  # noqa: BLE001 - report any start-up failure
-    logging.getLogger(__name__).error("FAXORA failed to start:\n%s", traceback.format_exc())
-    _reason = re.sub(r"://[^/\s@]+@", "://***@", f"{type(exc).__name__}: {exc}")[:500]
-
-    def app(environ, start_response):
-        body = (
-            "FAXORA could not start on this deployment.\n\n"
-            f"Reason: {_reason}\n\n"
-            "Check the project's Environment Variables in Vercel (SECRET_KEY, DATABASE_URL), "
-            "then redeploy.\n"
-        ).encode()
-        start_response("503 Service Unavailable", [("Content-Type", "text/plain; charset=utf-8"),
-                                                   ("Content-Length", str(len(body)))])
-        return [body]
+app = getattr(faxora, "app", None) or faxora.safe_create_app()

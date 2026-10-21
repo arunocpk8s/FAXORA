@@ -50,8 +50,9 @@ def _database_url():
 def _secret_key():
     key = os.environ.get("SECRET_KEY")
     if not key and ON_VERCEL:
-        # Each serverless instance would get its own random key: logins and saved SMTP passwords would break.
-        raise RuntimeError("SECRET_KEY must be set in the Vercel project's environment variables.")
+        # A random key per serverless instance would break logins and saved SMTP passwords;
+        # create_app() refuses to start with an empty key and explains why.
+        return ""
     if not key:
         logging.getLogger(__name__).warning(
             "SECRET_KEY is not set; using a random key (sessions reset on restart)."

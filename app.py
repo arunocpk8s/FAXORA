@@ -1,6 +1,8 @@
 """Facility Tracker: app factory and routes."""
 import logging
 import os
+import re
+import traceback
 from datetime import timedelta
 
 import click
@@ -39,6 +41,8 @@ def create_app(test_config=None):
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
+    if not app.config.get("SECRET_KEY"):
+        raise RuntimeError("SECRET_KEY must be set in the Vercel project's environment variables.")
     try:
         os.makedirs(app.instance_path, exist_ok=True)
     except OSError:
@@ -554,3 +558,31 @@ def api_tickets():
     now = utcnow()
     tickets = _filtered_query(_read_filters(request.args)).all()
     return jsonify(tickets=[_ticket_row(t, now) for t in tickets], counts=_counts())
+
+
+def safe_create_app():
+    """create_app(), or a minimal app that explains why start-up failed (credentials in URLs masked)."""
+    try:
+        return create_app()
+    except Exception as exc:  # noqa: BLE001 - report any start-up failure
+        logging.getLogger(__name__).error("FAXORA failed to start:\n%s", traceback.format_exc())
+        reason = re.sub(r"://[^/\s@]+@", "://***@", f"{type(exc).__name__}: {exc}")[:500]
+
+        def startup_error(environ, start_response):
+            body = (
+                "FAXORA could not start on this deployment.\n\n"
+                f"Reason: {reason}\n\n"
+                "Check the project's Environment Variables in Vercel (SECRET_KEY, DATABASE_URL), "
+                "then redeploy.\n"
+            ).encode()
+            start_response("503 Service Unavailable", [("Content-Type", "text/plain; charset=utf-8"),
+                                                       ("Content-Length", str(len(body)))])
+            return [body]
+
+        return startup_error
+
+
+# Vercel's zero-config Flask support imports this module and serves its top-level `app`.
+# Locally (no VERCEL variable) `flask --app app run` and the tests use create_app() instead.
+if os.environ.get("VERCEL"):
+    app = safe_create_app()
