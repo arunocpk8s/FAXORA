@@ -581,8 +581,3 @@ def safe_create_app():
 
         return startup_error
 
-
-# Vercel's zero-config Flask support imports this module and serves its top-level `app`.
-# Locally (no VERCEL variable) `flask --app app run` and the tests use create_app() instead.
-if os.environ.get("VERCEL"):
-    app = safe_create_app()

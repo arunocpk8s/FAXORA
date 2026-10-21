@@ -1,0 +1,3 @@
+# Vercel: serve the Flask app from wsgi.py. Dependencies are installed from requirements.txt.
+[tool.vercel]
+entrypoint = "wsgi:app"
