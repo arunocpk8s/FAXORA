@@ -3,7 +3,7 @@
   "use strict";
 
   var REFRESH_MS = 60000;
-  var COLUMNS = ["title", "category", "priority", "status", "requester", "team", "due_at", "time_left"];
+  var COLUMNS = ["title", "category", "priority", "status", "requester", "seat", "team", "due_at", "time_left"];
 
   function cell(text, className) {
     var td = document.createElement("td");
@@ -42,7 +42,7 @@
         } else if (key === "time_left") {
           tr.appendChild(cell(t.time_left, t.overdue ? "overdue" : ""));
         } else {
-          tr.appendChild(cell(t[key] || (key === "team" ? "—" : "")));
+          tr.appendChild(cell(t[key] || (key === "team" || key === "seat" ? "—" : "")));
         }
       });
       tbody.appendChild(tr);

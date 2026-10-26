@@ -35,7 +35,7 @@
           {% for r in roles %}<option value="{{ r }}" {% if form.role == r %}selected{% endif %}>{{ r.title() }}</option>{% endfor %}
         </select>
         <p class="hint">Agent: handles their team's tickets. Admin: everything, including this console.
-          Employees (requesters) are not created here; they will sign in with company SSO.</p>
+          Employees (requesters) are not created here; they get an account on their first Microsoft sign-in.</p>
         {% if errors.role %}<p class="error">{{ errors.role }}</p>{% endif %}
       </div>
       <div id="team-field">
@@ -48,17 +48,24 @@
       </div>
     </div>
     {% if not user %}
+    {% if sso_enabled %}
+    <p class="hint">They sign in with Microsoft using this email; the account is linked on their first sign-in.
+      Leave the password empty unless they also need a password (for example the break-glass admin).</p>
+    {% endif %}
     <div class="row">
       <div>
-        <label for="password">Password (at least 8 characters)</label>
-        <input id="password" name="password" type="password" autocomplete="new-password" required>
+        <label for="password">Password (at least 8 characters{{ ", optional" if sso_enabled }})</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" {% if not sso_enabled %}required{% endif %}>
         {% if errors.password %}<p class="error">{{ errors.password }}</p>{% endif %}
       </div>
       <div>
         <label for="password2">Repeat password</label>
-        <input id="password2" name="password2" type="password" autocomplete="new-password" required>
+        <input id="password2" name="password2" type="password" autocomplete="new-password" {% if not sso_enabled %}required{% endif %}>
       </div>
     </div>
+    {% else %}
+    <p class="hint">Sign-in: {{ "Microsoft" if user.sso_oid else "Password only" }}{% if user.sso_oid and user.password_hash %} (also has a password){% endif %}.
+      Last sign-in: {{ user.last_login_at | ist if user.last_login_at else "never" }}.</p>
     {% endif %}
     <button type="submit">{{ "Save changes" if user else "Create user" }}</button>
     <a href="{{ url_for('admin.users') }}">Cancel</a>
@@ -67,7 +74,8 @@
 
 {% if user %}
 <section class="card">
-  <h2>Reset password</h2>
+  <h2>{{ "Set a password" if sso_enabled and not user.password_hash else "Reset password" }}</h2>
+  {% if sso_enabled %}<p class="hint">Not needed for people who sign in with Microsoft.</p>{% endif %}
   <form method="post" action="{{ url_for('admin.reset_password', user_id=user.id) }}"
         data-confirm="Set a new password for {{ user.username }}?">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

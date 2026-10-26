@@ -181,11 +181,18 @@ def _ticket_url(ticket):
     return f"{base}/tickets/{ticket.id}"
 
 
+def _where(ticket):
+    """Location plus seat, e.g. 'Block B, 3F (seat 1C-154)'."""
+    return f"{ticket.location} (seat {ticket.seat_number})" if ticket.seat_number else ticket.location
+
+
 def _body(ticket, intro):
+    seat = f"Seat:     {ticket.seat_number}\n" if ticket.seat_number else ""
     return (
         f"{intro}\n\n"
         f"Ticket:   {ticket.ticket_no}\n"
         f"Title:    {ticket.title}\n"
+        f"{seat}"
         f"Category: {ticket.category}\n"
         f"Priority: {ticket.priority}\n"
         f"Status:   {ticket.status}\n"
@@ -209,7 +216,7 @@ def ticket_created(ticket):
         _body(
             ticket,
             f"A new {ticket.category.lower()} request was raised by {ticket.requester.full_name} "
-            f"({ticket.department}) at {ticket.location}.",
+            f"({ticket.department}) at {_where(ticket)}.",
         ),
         ticket,
     )
@@ -224,11 +231,11 @@ def sos_raised(ticket, phone=""):
     contact = f"\nContact number: {phone}" if phone else ""
     send(
         responders,
-        f"SOS [{ticket.ticket_no}] Urgent help needed at {ticket.location}",
+        f"SOS [{ticket.ticket_no}] Urgent help needed at {_where(ticket)}",
         _body(
             ticket,
             f"SOS raised by {ticket.requester.full_name} ({ticket.department}).\n"
-            f"Location: {ticket.location}{contact}\n"
+            f"Location: {_where(ticket)}{contact}\n"
             "Please respond immediately and update the ticket.",
         ),
         ticket,

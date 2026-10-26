@@ -29,7 +29,7 @@
 <div class="table-wrap">
 <table>
   <thead>
-    <tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Department</th><th>Status</th><th></th></tr>
+    <tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Team</th><th>Department</th><th>Sign-in</th><th>Last sign-in</th><th>Status</th><th></th></tr>
   </thead>
   <tbody>
     {% for u in users %}
@@ -40,6 +40,8 @@
       <td>{{ u.role.title() }}</td>
       <td>{{ u.team.title() if u.team else "—" }}</td>
       <td>{{ u.department or "—" }}</td>
+      <td>{{ "Microsoft" if u.sso_oid else "Password" }}</td>
+      <td>{{ u.last_login_at | ist if u.last_login_at else "—" }}</td>
       <td>{% if u.active %}Active{% else %}<span class="muted">Deactivated</span>{% endif %}</td>
       <td><a href="{{ url_for('admin.edit_user', user_id=u.id) }}">Edit</a></td>
     </tr>

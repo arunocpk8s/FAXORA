@@ -7,7 +7,7 @@
   <ul>
     {% for t in sos_open %}
     <li><a href="{{ url_for('main.ticket_detail', ticket_id=t.id) }}">{{ t.ticket_no }}</a>:
-      {{ t.requester.full_name }} at {{ t.location }} (raised {{ t.created_at | ist }}, {{ t.status }})</li>
+      {{ t.requester.full_name }} at {{ t.location }}{% if t.seat_number %}, seat {{ t.seat_number }}{% endif %} (raised {{ t.created_at | ist }}, {{ t.status }})</li>
     {% endfor %}
   </ul>
 </section>
@@ -71,7 +71,7 @@
   <thead>
     <tr>
       <th>Ticket</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th>
-      <th>Requester</th><th>Team</th><th>Due at</th><th>Time left</th>
+      <th>Requester</th><th>Seat</th><th>Team</th><th>Due at</th><th>Time left</th>
     </tr>
   </thead>
   <tbody>
@@ -83,6 +83,7 @@
       <td>{{ r.priority }}</td>
       <td><span class="status status-{{ r.status }}">{{ r.status }}</span></td>
       <td>{{ r.requester }}</td>
+      <td>{{ r.seat or "—" }}</td>
       <td>{{ r.team or "—" }}</td>
       <td>{{ r.due_at }}</td>
       <td class="{% if r.overdue %}overdue{% endif %}">{{ r.time_left }}</td>

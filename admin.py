@@ -77,6 +77,7 @@ def _render_user_form(user, data, errors, status=200):
         roles.insert(0, user.role)
     return render_template(
         "admin/user_form.html", user=user, form=data, errors=errors, roles=roles, teams=CATEGORIES,
+        sso_enabled=current_app.config["SSO_ENABLED"],
     ), status
 
 
@@ -139,7 +140,10 @@ def new_user():
         errors["username"] = "3-40 characters: letters, numbers, dot, dash or underscore."
     elif User.query.filter(func.lower(User.username) == data["username"].lower()).first():
         errors["username"] = "This username is already taken."
-    password_error = _validate_password(request.form.get("password", ""), request.form.get("password2", ""))
+    password = request.form.get("password", "")
+    # With SSO the person signs in with Microsoft (linked by email), so a password is optional.
+    sso_only = current_app.config["SSO_ENABLED"] and not password and not request.form.get("password2")
+    password_error = None if sso_only else _validate_password(password, request.form.get("password2", ""))
     if password_error:
         errors["password"] = password_error
     if errors:
@@ -147,9 +151,10 @@ def new_user():
 
     user = User(username=data["username"], full_name=data["full_name"], email=data["email"],
                 department="", role=data["role"], team=data["team"] or None, active=True)
-    user.set_password(request.form["password"])
+    if not sso_only:
+        user.set_password(password)
     db.session.add(user)
-    detail = f"role {user.role}" + (f", team {user.team}" if user.team else "")
+    detail = f"role {user.role}" + (f", team {user.team}" if user.team else "") + (", Microsoft sign-in" if sso_only else "")
     add_admin_event(g.user, "USER_CREATED", user.username, detail)
     db.session.commit()
     current_app.logger.info("Admin %s created user %s", g.user.username, user.username)
@@ -236,7 +241,8 @@ def _ticket_query(args):
         query = query.filter(Ticket.status == status)
     if q:
         like = f"%{q}%"
-        query = query.filter(or_(Ticket.ticket_no.ilike(like), Ticket.title.ilike(like), Ticket.location.ilike(like)))
+        query = query.filter(or_(Ticket.ticket_no.ilike(like), Ticket.title.ilike(like), Ticket.location.ilike(like),
+                                     Ticket.seat_number.ilike(like)))
     filters = {"month": month if parse_month(month) else "", "status": status if status in STATUSES else "",
                "q": q, "show": "deleted" if deleted else ""}
     return query.order_by(Ticket.created_at.desc()), filters

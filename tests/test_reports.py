@@ -67,7 +67,7 @@ def test_export_blocks_formula_injection(app, client):
         db.session.commit()
     login(client, "admin")
     rows = read_csv(client.get("/tickets/export.csv"))
-    assert rows[1][10].startswith("'=")
+    assert rows[1][11].startswith("'=")
 
 
 def test_export_omits_description(app, client):

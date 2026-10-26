@@ -13,3 +13,6 @@ backup/
 logs/
 *.log
 .vercel/
+
+# Local tool configuration (contains an authorization header)
+.mcp.json

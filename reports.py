@@ -7,7 +7,7 @@ from sla import format_ist
 
 EXPORT_COLUMNS = [
     "Ticket", "Created (IST)", "Category", "Priority", "Status", "Team", "SOS", "Requester",
-    "Department", "Location", "Title", "Due (IST)", "Resolved (IST)", "Resolution hours", "SLA",
+    "Department", "Location", "Seat", "Title", "Due (IST)", "Resolved (IST)", "Resolution hours", "SLA",
 ]
 SUMMARY_COLUMNS = ["Group", "Created", "Open", "Resolved/closed", "Cancelled", "Breached", "SLA met %", "Avg resolution hours"]
 
@@ -46,7 +46,7 @@ def tickets_csv(tickets):
     return _csv(EXPORT_COLUMNS, (
         [t.ticket_no, format_ist(t.created_at), t.category, t.priority, t.status,
          t.assigned_team or "", "Yes" if t.is_sos else "No", t.requester.full_name, t.department,
-         t.location, t.title, format_ist(t.due_at), format_ist(t.resolved_at),
+         t.location, t.seat_number or "", t.title, format_ist(t.due_at), format_ist(t.resolved_at),
          resolution_hours(t), sla_result(t)]
         for t in tickets
     ))

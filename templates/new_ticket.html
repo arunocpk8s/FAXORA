@@ -42,6 +42,9 @@
         <label for="location">Location</label>
         <input id="location" name="location" maxlength="200" value="{{ form.location }}" placeholder="Building, floor, room" required>
         {% if errors.location %}<p class="error">{{ errors.location }}</p>{% endif %}
+        <label for="seat_number">Seat number (optional)</label>
+        <input id="seat_number" name="seat_number" maxlength="20" value="{{ form.seat_number }}" placeholder="e.g. 1C-154" autocomplete="off">
+        {% if errors.seat_number %}<p class="error">{{ errors.seat_number }}</p>{% endif %}
       </div>
     </div>
 

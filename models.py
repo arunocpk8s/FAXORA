@@ -44,14 +44,20 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="employee")
     # Agents only: the facility team they belong to (one of config.CATEGORIES).
     team = db.Column(db.String(20))
-    password_hash = db.Column(db.String(255), nullable=False)
+    # Empty for people who only sign in with Microsoft.
+    password_hash = db.Column(db.String(255), nullable=False, default="")
     active = db.Column(db.Boolean, nullable=False, default=True)
+    # Microsoft Entra ID object id (the "oid" claim): the unchanging link to the company account.
+    sso_oid = db.Column(db.String(64), unique=True, index=True)
+    # How the person last signed in: "local" (password) or "sso" (Microsoft).
+    auth_source = db.Column(db.String(10), nullable=False, default="local", server_default="local")
+    last_login_at = db.Column(db.DateTime)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return bool(self.password_hash) and check_password_hash(self.password_hash, password)
 
     @property
     def is_staff(self):
@@ -87,6 +93,8 @@ class Ticket(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     location = db.Column(db.String(200), nullable=False)
+    # Desk/seat of the requester, e.g. 1C-154 (optional; see app.normalize_seat).
+    seat_number = db.Column(db.String(20))
     status = db.Column(db.String(20), nullable=False, default="NEW", index=True)
     # Facility team handling the ticket (one of config.CATEGORIES); set by an admin.
     assigned_team = db.Column(db.String(20), index=True)
@@ -252,6 +260,10 @@ ADDED_COLUMNS = [
     ("tickets", "deleted_by_id", "INTEGER REFERENCES users(id)"),
     ("users", "team", "VARCHAR(20)"),
     ("tickets", "assigned_team", "VARCHAR(20)"),
+    ("users", "sso_oid", "VARCHAR(64)"),
+    ("users", "auth_source", "VARCHAR(10) NOT NULL DEFAULT 'local'"),
+    ("users", "last_login_at", "TIMESTAMP"),
+    ("tickets", "seat_number", "VARCHAR(20)"),
 ]
 
 
@@ -263,6 +275,8 @@ def upgrade_schema():
         for table, column, definition in ADDED_COLUMNS:
             if column not in existing[table]:
                 conn.execute(sa.text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
+        # Same name create_all() gives the unique index, so new and upgraded databases match.
+        conn.execute(sa.text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_sso_oid ON users (sso_oid)"))
         # The ASSIGNED status was removed: assigned tickets are now IN_PROGRESS.
         conn.execute(sa.text("UPDATE tickets SET status = 'IN_PROGRESS' WHERE status = 'ASSIGNED'"))
         # Tickets used to be assigned to a person: carry that person's team over.

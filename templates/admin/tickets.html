@@ -5,7 +5,7 @@
 
 <form class="filters" method="get" action="{{ url_for('admin.tickets') }}">
   <label>Search
-    <input name="q" value="{{ filters.q }}" placeholder="Ticket no, title or location">
+    <input name="q" value="{{ filters.q }}" placeholder="Ticket no, title, location or seat">
   </label>
   <label>Month
     <select name="month">

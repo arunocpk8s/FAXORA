@@ -15,6 +15,7 @@
     <dt>Requester</dt><dd>{{ ticket.requester.full_name }}</dd>
     <dt>Department</dt><dd>{{ ticket.department }}</dd>
     <dt>Location</dt><dd>{{ ticket.location }}</dd>
+    <dt>Seat number</dt><dd>{{ ticket.seat_number or "—" }}</dd>
     <dt>Assigned team</dt><dd>{{ ticket.assigned_team.title() ~ " team" if ticket.assigned_team else "Not assigned yet" }}</dd>
     <dt>Created</dt><dd>{{ ticket.created_at | ist }}</dd>
     <dt>Due</dt><dd>{{ ticket.due_at | ist }}{% if time_left %} <span class="{% if ticket.breached %}overdue{% endif %}">({{ time_left }})</span>{% endif %}</dd>

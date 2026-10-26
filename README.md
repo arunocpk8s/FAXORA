@@ -1,10 +1,19 @@
-# Facility Tracker
+# FAXORA Facility Tracker
 
 A small internal web app for raising and tracking facility requests (Transport, Security,
-Housekeeping, Maintenance, Others). Flask + SQLAlchemy + server-rendered Jinja2 templates.
+Housekeeping, Maintenance, Medical, Others) with an SOS button. Flask + SQLAlchemy + server-rendered
+Jinja2 templates.
+
+Developed by: **Arun Arumugam**
+
+| Environment | Where | Database | Sign-in |
+|---|---|---|---|
+| Development | your PC (`flask run`) | SQLite `instance/tracker.db` | username and password |
+| Test | Vercel (`https://faxora.vercel.app`) | Neon PostgreSQL (test data only) | username and password |
+| Production | Azure App Service | its own Azure Database for PostgreSQL | Microsoft (Entra ID) SSO, break-glass admin |
 
 - **Employees** raise requests and see their own tickets.
-- **Agents** see all tickets, assign them, and move them through the workflow.
+- **Agents** handle their facility team's tickets and move them through the workflow.
 - SLA due times are set per category (see `sla.py`); urgent tickets get half the time.
 - Times are stored in UTC and shown in Asia/Kolkata (IST).
 - Emails are sent on create, status change and assignment. Failed emails are kept and can be retried.
@@ -113,7 +122,7 @@ in `static/` as `logo.svg`, `logo.png` or `logo.jpg` (about 36px tall is display
 
 | Role | Can do |
 |---|---|
-| employee | Raise requests and SOS; see their own tickets (will sign in with Azure SSO, see `docs/`) |
+| employee | Raise requests and SOS; see their own tickets (signs in with Microsoft when SSO is on) |
 | agent | Member of one facility team; sees and updates that team's tickets: those assigned to it, and unassigned ones in its category; sees every active SOS; can cancel |
 | admin | Sees all tickets; assigns teams; updates and cancels any ticket; Admin console (users, delete, reports, mail) |
 
@@ -170,8 +179,10 @@ Admins see an **Admin console** link in the header (`/admin`). Other roles get 4
   and the last 30 admin actions.
 - **Users:** search and filter; add an **agent or admin** (username, name, email, role, team for
   agents, password); edit details, role and team; reset a password; deactivate or reactivate.
-  Employees are not created here: they will sign in with Azure SSO (plan in `docs/`). Until then,
-  test employees come from `seed.py` or `flask create-user`.
+  Employees are not created here: with SSO on they get an account on their first Microsoft
+  sign-in. Without SSO (development, test), employees come from `seed.py` or `flask create-user`.
+  With SSO on, staff can be added **without a password**: they sign in with Microsoft and are
+  linked by email. The list shows each person's sign-in method and last sign-in.
   Users are never deleted, because tickets and history refer to them. Deactivated users are signed
   out at once and cannot log in. You cannot deactivate yourself or remove your own admin role,
   and the last active admin is protected.
@@ -213,48 +224,119 @@ recorded or logged.
 Edit `SLA_HOURS` (hours per category) and `PRIORITY_FACTOR` (urgent multiplier) in `sla.py`.
 The new values apply to tickets created after the change.
 
+## Microsoft sign-in (SSO)
+
+Employees and staff sign in with their company Microsoft account (Microsoft Entra ID, OpenID
+Connect authorisation code flow with PKCE, using Microsoft's `msal` library). Off by default.
+
+**Account rules.** Matched by the Microsoft object id (`oid`); on the first sign-in, by email to an
+account that already exists (for example an agent added in the Admin console), which is then
+linked; otherwise a new **employee** is created. Role and team always come from FAXORA, never from
+Microsoft. Name and email are refreshed from Microsoft at each sign-in; the department is read from
+the Microsoft profile when it matches `DEPARTMENTS`. Deactivated users and accounts from other
+tenants are refused. Account creation, linking and break-glass logins are written to the admin log.
+
+**What IT provides** (single-tenant app registration "FAXORA Facility Tracker"):
+redirect URI `https://<production host>/auth/callback` (and `http://localhost:5000/auth/callback`
+for development), delegated permissions `openid profile email User.Read` with admin consent, the
+tenant id, client id and a client secret (note its expiry date).
+
+**Settings:**
+
+| Setting | Meaning |
+|---|---|
+| `SSO_ENABLED` | `true` shows "Sign in with Microsoft" |
+| `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` | from the app registration; the app refuses to start with SSO on and any of them empty |
+| `AZURE_REDIRECT_URI` | optional; default `APP_BASE_URL` + `/auth/callback` |
+| `SSO_READ_DEPARTMENT` | read the department from Microsoft Graph (default `true`) |
+| `LOCAL_LOGIN_ENABLED` | username/password login for everyone (default `true`); set `false` at go-live |
+| `BREAK_GLASS_USERS` | usernames that may still use a password when local login is off (e.g. `admin`) |
+| `SESSION_HOURS` | signed-in session length, default 8 |
+
+**Go-live:** pilot with `SSO_ENABLED=true` and `LOCAL_LOGIN_ENABLED=true`; make sure every staff
+email in the console matches their Microsoft email; then set `LOCAL_LOGIN_ENABLED=false` and
+`BREAK_GLASS_USERS=admin` (long random password, kept by the facility manager), and deactivate the
+test accounts. Logout also signs the person out of Microsoft. Rotate the client secret before it
+expires: put the new one in `AZURE_CLIENT_SECRET` and restart.
+
+## Production on Azure App Service
+
+Production runs on **Azure App Service (Linux, Python 3.12, gunicorn)** with its **own Azure
+Database for PostgreSQL flexible server**. It never shares a database with the Vercel/Neon test copy.
+With `APP_ENV=production` the app refuses to start without PostgreSQL, a `SECRET_KEY`, or an
+`https://` `APP_BASE_URL`, and shows the reason on a plain error page.
+
+Requirements: Azure CLI (`az login`), PowerShell 7.3+, and the right to create resources.
+
+1. **Create the resources** (once; billable):
+   ```powershell
+   .\deploy\azure\provision.ps1 -ResourceGroup rg-faxora-prod -AppName faxora-prod -PgServer faxora-prod-pg
+   ```
+   This creates the resource group, the PostgreSQL server (TLS required, 14-day backups) and the
+   `faxora` database, an App Service plan and web app (HTTPS only, TLS 1.2, FTP off, Always On,
+   health check `/healthz`, start command `gunicorn ... wsgi:app`), and sets `APP_ENV=production`,
+   `APP_BASE_URL`, `PGHOST`/`PGUSER`/`PGDATABASE` and generated `SECRET_KEY` and `PGPASSWORD`.
+   Secrets are written only to the App Service settings and are not printed.
+2. **Deploy the code** (every release; commit first):
+   ```powershell
+   .\deploy\azure\deploy.ps1 -ResourceGroup rg-faxora-prod -AppName faxora-prod
+   ```
+   It zips the **last commit** (so `.env`, `docs/` and uncommitted work are never uploaded), adds
+   the company logo from this PC, uploads it, and App Service installs `requirements.txt`.
+3. **Create the first admin:** Azure portal → the web app → **SSH**, then
+   ```bash
+   cd $APP_PATH && source antenv/bin/activate     # the app folder and its packages
+   export SEED_ADMIN_PASSWORD='<long random password>'
+   python seed.py
+   ```
+   This `admin` is the break-glass account. The sample `agent`/`employee` are skipped (with a
+   message) unless their passwords are set; leave them out in production.
+4. **Microsoft sign-in:** add `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` and
+   `SSO_ENABLED=true` in **Settings → Environment variables**, then restart (see the SSO section).
+5. **Mail:** `SMTP_*` settings, or Admin console → Mail settings. Outbound port 25 is blocked from
+   Azure; use the company relay on 587 with STARTTLS.
+6. **Custom domain:** add the host name and certificate in App Service, then change `APP_BASE_URL`
+   and the redirect URI in the app registration to match.
+7. **Check:** `https://<app>.azurewebsites.net/healthz` returns `{"status": "ok", "database": "ok"}`.
+
+**Recommended hardening:** keep `PGPASSWORD`, `SECRET_KEY` and `AZURE_CLIENT_SECRET` in Azure Key
+Vault and reference them from the app settings (`@Microsoft.KeyVault(...)`); restrict PostgreSQL
+to a private VNet (or the app's outbound IPs) instead of "allow Azure services"; give the app its
+own PostgreSQL role instead of the server admin.
+
+**Operations:** logs in App Service → Log stream; database backups are automatic (point-in-time
+restore, 14 days). Retry failed emails with Admin console → Email outbox → **Resend all**, or from
+SSH: `python -m flask --app app resend-failed`.
+
 ## Test deployment on Vercel
 
-The repository deploys to Vercel with its Flask support: `pyproject.toml` points Vercel at
+The test copy deploys to Vercel with its Flask support: `pyproject.toml` points Vercel at
 `wsgi:app` (`wsgi.py`); Vercel installs the packages listed in `pyproject.toml` / `uv.lock`
-(keep them in sync with `requirements.txt`, which local installs use).
-Local use is unchanged: without `VERCEL` set, it still uses `.env` and the SQLite file.
+(keep them in sync with `requirements.txt`; after changing them run `python -m uv lock`).
+It uses a Neon PostgreSQL database with test data only. Every push to `main` redeploys it.
 
 1. In Vercel: **Add New -> Project**, import this GitHub repository, keep the defaults, deploy.
 2. **Storage -> Create database -> Neon (Postgres)** and connect it to the project. This sets
    `DATABASE_URL`. Until it is connected, the app uses a temporary SQLite file in `/tmp` that is
-   wiped often.
-3. **Settings -> Environment Variables**: add `SECRET_KEY` (64 random hex characters; required,
-   the app refuses to start without it on Vercel) and `APP_BASE_URL` (`https://<project>.vercel.app`).
-   Optional: `SMTP_*`, `CATEGORY_MAILBOX_*` (or set mail in the Admin console later).
+   wiped often (a warning is shown on every page).
+3. **Settings -> Environment Variables**: add `SECRET_KEY` (64 random hex characters; required)
+   and `APP_BASE_URL` (`https://<project>.vercel.app`). Optional: `APP_ENV=test`, `SMTP_*`,
+   `CATEGORY_MAILBOX_*` (or set mail in the Admin console later).
 4. **Deployments -> Redeploy** so the new variables are used.
-5. Create the first users in the Vercel database from your PC (PowerShell, project folder):
+5. Create the first users in the Neon database from your PC (PowerShell, project folder). Copy the
+   connection string from Vercel → Storage → the database → `.env.local` → **Show secret** (hidden
+   values are `*****` and will not work):
    ```powershell
-   $env:DATABASE_URL = "<Neon connection string from Vercel Storage -> .env.local>"
+   $env:DATABASE_URL = 'postgresql://...'
    .venv\Scripts\python.exe seed.py
    Remove-Item Env:DATABASE_URL
    ```
-   `seed.py` uses the `SEED_*_PASSWORD` values from your local `.env`.
+   `seed.py` uses the `SEED_*_PASSWORD` values from your local `.env`. A pasted value with quotes,
+   `< >`, the whole `DATABASE_URL=...` line or a `psql '...'` command is accepted.
 
 Notes: cookies are Secure automatically on Vercel; emails go out only when SMTP is configured
 (Gmail port 587 works from Vercel; port 25 is blocked there). Scheduled `resend-failed` is not set
 up on Vercel; use **Admin console -> Email outbox -> Resend all** instead.
-
-## Deploying later
-
-1. **Server:** run behind a WSGI server instead of `flask run`, e.g.
-   `python -m pip install waitress` then `python -m waitress --port=8000 --call app:create_app` (Windows), or
-   `pip install gunicorn` then `gunicorn -w 2 "app:create_app()"` (Linux). Put it behind IIS/nginx
-   with HTTPS.
-2. **HTTPS cookies:** set `SESSION_COOKIE_SECURE=true` once served over HTTPS.
-3. **Settings:** set real values for `SECRET_KEY`, `APP_BASE_URL` (the public URL used in email
-   links), SMTP settings and category mailboxes in the server environment.
-4. **PostgreSQL:** `pip install psycopg[binary]` and set
-   `DATABASE_URL=postgresql+psycopg://user:password@host/dbname`. Tables are created on first
-   start. For later schema changes, add Flask-Migrate (Alembic).
-5. **Seed** once on the server with `python seed.py`.
-6. **Backups:** back up `instance/tracker.db` (SQLite) or the PostgreSQL database regularly.
-7. **Email retries:** schedule `python -m flask --app app resend-failed`.
 
 ## Project layout
 
@@ -265,11 +347,15 @@ reports.py    CSV exports and monthly summary figures
 models.py     User, Ticket, TicketEvent, EmailOutbox, Setting, AdminEvent; status transitions
 sla.py        SLA hours, due dates, IST helpers
 notify.py     SMTP email sending and retry
-auth.py       login, logout, login_required, role_required
+auth.py       login (password, Microsoft, break-glass), logout, login_required, role_required
+sso.py        Microsoft Entra ID sign-in (MSAL) and account matching
 seed.py       creates the initial users
-config.py     reads environment variables
+config.py     reads environment variables (APP_ENV, database, SSO)
+wsgi.py       entry point for gunicorn (Azure) and Vercel: wsgi:app
+deploy/azure/ provision.ps1 (Azure resources) and deploy.ps1 (zip deploy of the last commit)
+.github/      GitHub Actions: tests on every push
 templates/    Jinja2 templates (admin/ holds the console pages)
 static/       style.css, app.js, logo
 tests/        pytest tests
-docs/         HLD, LLD, runbook, components (Word/PDF) and the technical deck
+docs/         HLD, LLD, runbook, components, SSO design (Word/PDF) and the technical deck; local only, not in git
 ```

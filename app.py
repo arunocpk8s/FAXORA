@@ -11,7 +11,8 @@ from flask import (
     request, url_for,
 )
 from flask_wtf.csrf import CSRFProtect
-from sqlalchemy import and_, case, false
+from sqlalchemy import and_, case, false, text
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import notify
 import reports
@@ -36,13 +37,34 @@ csrf = CSRFProtect()
 bp = Blueprint("main", __name__)
 
 
+def check_settings(config):
+    """Refuse to start with settings that are unsafe for a hosted or production copy."""
+    if not config.get("SECRET_KEY"):
+        raise RuntimeError("SECRET_KEY must be set in the app settings (environment variables).")
+    uri = config.get("SQLALCHEMY_DATABASE_URI") or ""
+    if config.get("APP_ENV") == "production":
+        if not uri.startswith("postgresql"):
+            raise RuntimeError(
+                "APP_ENV=production needs its own PostgreSQL database: set DATABASE_URL (or PGHOST, PGUSER, "
+                "PGPASSWORD, PGDATABASE). SQLite is not allowed in production."
+            )
+        if not (config.get("APP_BASE_URL") or "").startswith("https://"):
+            raise RuntimeError("APP_BASE_URL must be the https:// address of the production site.")
+    if config.get("SSO_ENABLED"):
+        missing = [k for k in ("AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET") if not config.get(k)]
+        if missing:
+            raise RuntimeError("SSO_ENABLED is true but these settings are empty: " + ", ".join(missing) + ".")
+
+
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(Config)
     if test_config:
         app.config.update(test_config)
-    if not app.config.get("SECRET_KEY"):
-        raise RuntimeError("SECRET_KEY must be set in the Vercel project's environment variables.")
+    check_settings(app.config)
+    if app.config["TRUST_PROXY"]:
+        # One proxy in front (Azure App Service front end or Vercel): trust its client IP and https scheme.
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     try:
         os.makedirs(app.instance_path, exist_ok=True)
     except OSError:
@@ -167,6 +189,26 @@ def _user_or_fail(username):
     return user
 
 
+# Seat numbers look like 1C-154: floor digits, block letter(s), dash, seat digits.
+SEAT_RE = re.compile(r"^(\d{1,3})\s*([A-Z]{1,2})\s*-?\s*(\d{1,4})$")
+SEAT_ERROR = "Enter the seat number like 1C-154, or leave it empty."
+
+
+def normalize_seat(value):
+    """'1c 154' -> '1C-154'; empty stays ''; None if it is not a seat number."""
+    value = (value or "").strip().upper()
+    if not value:
+        return ""
+    match = SEAT_RE.match(value)
+    return f"{match.group(1)}{match.group(2)}-{match.group(3)}" if match else None
+
+
+def _last_seat(user):
+    last = Ticket.query.filter(Ticket.requester_id == user.id, Ticket.seat_number.isnot(None)) \
+        .order_by(Ticket.created_at.desc()).first()
+    return last.seat_number if last else ""
+
+
 # --- helpers -----------------------------------------------------------------------------
 
 TICKET_FIELDS = ("department", "category", "priority", "title", "location", "description")
@@ -270,6 +312,7 @@ def _ticket_row(ticket, now):
         "status": ticket.status,
         "requester": ticket.requester.full_name,
         "location": ticket.location,
+        "seat": ticket.seat_number or "",
         "is_sos": ticket.is_sos,
         "team": ticket.assigned_team.title() if ticket.assigned_team else "",
         "due_at": format_ist(ticket.due_at),
@@ -325,6 +368,17 @@ def _render_new_ticket(form, errors):
 
 # --- routes ------------------------------------------------------------------------------
 
+@bp.route("/healthz")
+def healthz():
+    """For Azure App Service Health check: 200 when the app and its database answer. No login needed."""
+    try:
+        db.session.execute(text("SELECT 1"))
+    except Exception:  # noqa: BLE001 - any database failure means unhealthy
+        current_app.logger.exception("Health check: database not reachable")
+        return jsonify(status="error", database="unreachable"), 503
+    return jsonify(status="ok", database="ok")
+
+
 @bp.route("/")
 @login_required
 def dashboard():
@@ -362,6 +416,7 @@ def new_ticket():
         form.update(
             department=g.user.department if g.user.department in DEPARTMENTS else "",
             priority="NORMAL",
+            seat_number=_last_seat(g.user),
         )
         return _render_new_ticket(form, {})
 
@@ -372,8 +427,11 @@ def new_ticket():
     for field in ("department", "title", "location"):
         form[field] = " ".join(form[field].split())
     errors = _validate_ticket_form(form)
+    seat = normalize_seat(request.form.get("seat_number", ""))
+    if seat is None:
+        errors["seat_number"] = SEAT_ERROR
     if errors:
-        return _render_new_ticket(form, errors), 400
+        return _render_new_ticket(dict(form, seat_number=request.form.get("seat_number", "")), errors), 400
 
     now = utcnow()
     ticket = Ticket(
@@ -382,6 +440,7 @@ def new_ticket():
         created_at=now,
         updated_at=now,
         due_at=compute_due_at(now, form["category"], form["priority"]),
+        seat_number=seat or None,
         **form,
     )
     db.session.add(ticket)
@@ -402,18 +461,23 @@ def sos():
         Ticket.live().filter_by(requester_id=g.user.id).order_by(Ticket.created_at.desc()).first()
     )
     if request.method == "GET":
-        form = {"location": last.location if last else "", "phone": "", "note": ""}
+        form = {"location": last.location if last else "", "seat_number": _last_seat(g.user), "phone": "", "note": ""}
         return render_template("sos.html", form=form, errors={})
 
     form = {
         "location": " ".join(request.form.get("location", "").split())[:200],
+        "seat_number": request.form.get("seat_number", "").strip()[:20],
         "phone": " ".join(request.form.get("phone", "").split())[:40],
         "note": request.form.get("note", "").strip()[:2000],
     }
+    seat = normalize_seat(form["seat_number"])
+    sos_errors = {}
     if not form["location"]:
-        return render_template(
-            "sos.html", form=form, errors={"location": "Tell us where you are."}
-        ), 400
+        sos_errors["location"] = "Tell us where you are."
+    if seat is None:
+        sos_errors["seat_number"] = SEAT_ERROR
+    if sos_errors:
+        return render_template("sos.html", form=form, errors=sos_errors), 400
 
     if last and last.is_sos and last.is_open and utcnow() - last.created_at < SOS_DUPLICATE_WINDOW:
         flash(f"Your SOS {last.ticket_no} is already active. Help has been alerted.", "sos")
@@ -429,6 +493,7 @@ def sos():
         title="SOS: urgent help needed",
         description="\n\n".join(d for d in details if d) or "SOS raised with no further details.",
         location=form["location"],
+        seat_number=seat or None,
         status="NEW",
         is_sos=True,
         assigned_team="MEDICAL",
@@ -575,8 +640,8 @@ def safe_create_app():
             body = (
                 "FAXORA could not start on this deployment.\n\n"
                 f"Reason: {reason}\n\n"
-                "Check the project's Environment Variables in Vercel (SECRET_KEY, DATABASE_URL), "
-                "then redeploy.\n"
+                "Check the app settings (environment variables) of this deployment, such as SECRET_KEY, "
+                "DATABASE_URL and the AZURE_* sign-in settings, then restart or redeploy.\n"
             ).encode()
             start_response("503 Service Unavailable", [("Content-Type", "text/plain; charset=utf-8"),
                                                        ("Content-Length", str(len(body)))])

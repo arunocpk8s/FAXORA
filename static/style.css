@@ -103,3 +103,8 @@ button.sos-submit:hover { background: #b42318; }
 }
 .tab-count { display: inline-block; min-width: 22px; padding: 0 6px; margin-left: 4px; border-radius: 10px; background: #e4e7eb; font-size: 0.8rem; text-align: center; }
 .tabs a.active .tab-count { background: #1f2933; color: #fff; }
+
+/* Login: Microsoft sign-in first, password form folded away when SSO is on */
+.sso-button { display: block; text-align: center; padding: 10px 14px; }
+.local-login { margin-top: 20px; border-top: 1px solid #e4e7eb; padding-top: 12px; }
+.local-login summary { cursor: pointer; color: #616e7c; }
